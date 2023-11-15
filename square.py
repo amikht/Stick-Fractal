@@ -8,8 +8,8 @@ import argparse
 
 sys.setrecursionlimit(10000) # Needed 
 
-NUM_STEPS = 127 # For step num = 2n-1 for any n, the curve will form a square
-SCALE_FACTOR = 11
+NUM_STEPS = 63 # For step num = 2n-1 for any n, the curve will form a square
+SCALE_FACTOR = 12
 COLORS = [
     (0, 0, 0),
     (255, 0, 0),
@@ -21,7 +21,7 @@ COLORS = [
     (255, 255, 255)
 ]
 
-SCREEN_SIZE = 1300
+SCREEN_SIZE = 850
 
 t = Turtle()
 
@@ -34,24 +34,28 @@ class StickNode:
     A single line of the StickFractal graph. Nodes "point to" their parent
     creating an edge.
     """
-    def __init__(self, pos, orientation, parent):
+    def __init__(self, pos, orientation, parent, id=None):
         super(StickNode, self).__init__()
         self.x = pos[0]
         self.y = pos[1]
+        self.id = id
         self.parent = parent
-        self.children = [] # Every node will have 0 or 2 children.
-                           # It will always have 2 children extending from it,
+        self.neighbors = [] # Every node will have 0 or 2 neighbors.
+                           # It will always have 2 neighbors extending from it,
                            # however in the case two nodes are 1 space apart,
-                           # both of them will "own" the common child.
+                           # both of them will "own" the common neighbor.
                            # If a node shares a position with another node which has
-                           # a different parent, then both nodes will have 0 children
+                           # a different parent, then both nodes will have 0 neighbors
 
         self.extendable = True
         self.orientation = orientation
 
+        if parent:
+            self.neighbors.append(parent)
 
-    def add_child(self, node):
-        self.children.append(node)
+
+    def add_neighbor(self, node):
+        self.neighbors.append(node)
         return node
 
     def not_extendable(self):
@@ -72,14 +76,16 @@ class StickFractal:
     """
     def __init__(self):
         super(StickFractal, self).__init__()
-        self.head_node = StickNode([0,0], Orientation.HORIZONTAL, None) # The first node is at the origin and has no length
-        self.head_node.add_child(StickNode([0, 1], Orientation.VERTICAL, self.head_node))
-        self.head_node.add_child(StickNode([0, -1], Orientation.VERTICAL, self.head_node))
+        self.head_node = StickNode([0,0], Orientation.HORIZONTAL, None, 0) # The first node is at the origin and has no length
+        self.head_node.add_neighbor(StickNode([0, 1], Orientation.VERTICAL, self.head_node, 1))
+        self.head_node.add_neighbor(StickNode([0, -1], Orientation.VERTICAL, self.head_node, 2))
         self.head_node.not_extendable()
+        self.id_counter = 3
 
-        self.nodes = copy.deepcopy(self.head_node.children) # Simple list of all nodes in the graph
+        self.nodes = copy.deepcopy(self.head_node.neighbors) # Simple list of all nodes in the graph
+        print(self.nodes)
         self.nodes.append(self.head_node)
-        self.end_nodes = copy.deepcopy(self.head_node.children) # List of nodes without children
+        self.end_nodes = copy.deepcopy(self.head_node.neighbors) # List of nodes without children
 
     def next_step(self):
         """
@@ -93,12 +99,14 @@ class StickFractal:
             #print(node)
             if node.extendable:
                 if node.orientation == Orientation.HORIZONTAL:
-                    self.add_node(StickNode([node.x, node.y + 1], Orientation.VERTICAL, node), node)
-                    self.add_node(StickNode([node.x, node.y - 1], Orientation.VERTICAL, node), node)
+                    self.add_node(StickNode([node.x, node.y + 1], Orientation.VERTICAL, node, self.id_counter), node)
+                    self.add_node(StickNode([node.x, node.y - 1], Orientation.VERTICAL, node, self.id_counter + 1), node)
+                    self.id_counter += 2
                 if node.orientation == Orientation.VERTICAL:
-                    self.add_node(StickNode([node.x - 1, node.y], Orientation.HORIZONTAL, node), node)
-                    self.add_node(StickNode([node.x + 1, node.y], Orientation.HORIZONTAL, node), node)
-            #print(node.children)
+                    self.add_node(StickNode([node.x - 1, node.y], Orientation.HORIZONTAL, node, self.id_counter), node)
+                    self.add_node(StickNode([node.x + 1, node.y], Orientation.HORIZONTAL, node, self.id_counter + 1), node)
+                    self.id_counter += 2
+            #print(node.neighborren)
         #self.draw_graph(self.end_nodes)
 
 
@@ -121,14 +129,14 @@ class StickFractal:
                 t.penup()
 
         # Draw filled shapes for loops
-        loop_shapes = self.find_loops()
+        #loop_shapes = self.find_loops()
         # TODO
 
     def add_node(self, node, parent):
 
         self.nodes.append(node)
         self.end_nodes.append(node)
-        parent.add_child(node)
+        parent.add_neighbor(node)
 
         for other in self.nodes:
             if other.x == node.x and other.y == node.y and other.parent != node.parent:
@@ -136,19 +144,50 @@ class StickFractal:
                 other.not_extendable()
 
 
+class GraphPainter:
+    """Finds loops in a non-directed graph"""
+    def __init__(self, arg):
+        super(GraphPainter, self).__init__()
+        self.arg = arg
+        
     def find_loops(self):
         pass
         
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("steps",
+        help="Number of generation steps to perform before displaying final image",
+        type=int)
+    parser.add_argument('scale',
+        help="Length in pixels of connection between nodes",
+        type=int)
+    parser.add_argument("-w", "--width",
+        help="Size of the turtle screen to generate within in pixels. Screen will be square",
+        type=int)
+    parser.add_argument("-i", "--interactive-mode",
+        help="Pause generation and draw current shape after each generation step",
+        action="store_true")
+
+    args = parser.parse_args()
+    SCALE_FACTOR = args.scale
+    NUM_STEPS = args.steps
+
     fractal = StickFractal()
     fractal.init_graph()
+    if args.interactive_mode:
+        fractal.draw_graph(fractal.nodes)
+
     print("Generating shape...")
     for i in range(NUM_STEPS):
         fractal.next_step()
-        #input() # Wait for user press `enter' to continue
+        if args.interactive_mode:
+            fractal.draw_graph(fractal.end_nodes) # Draw only the new nodes
+            input() # Wait for user press `enter' to continue
+
     print("Drawing shape...")
     fractal.draw_graph(fractal.nodes)
+
     print("Done!")
-    turtle.mainloop()
+    turtle.mainloop() # Keep window alive
