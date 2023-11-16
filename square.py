@@ -169,6 +169,9 @@ if __name__ == "__main__":
     parser.add_argument("-i", "--interactive-mode",
         help="Pause generation and draw current shape after each generation step",
         action="store_true")
+    parser.add_argument("-l", "--limit",
+        help="Sets max recursion depth. Default=10000",
+        type=int)
 
     args = parser.parse_args()
     SCALE_FACTOR = args.scale
@@ -178,6 +181,9 @@ if __name__ == "__main__":
     fractal.init_graph()
     if args.interactive_mode:
         fractal.draw_graph(fractal.nodes)
+
+    if args.limit:
+        sys.setrecursionlimit(args.limit)
 
     print("Generating shape...")
     for i in range(NUM_STEPS):
